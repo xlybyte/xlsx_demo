@@ -1,0 +1,17 @@
+.drop {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+    box-sizing: inherit;
+    border: 2px dashed #bbb;
+    width: 600px;
+    height: 160px;
+    line-height: 160px;
+    margin: 0 auto;
+    font-size: 24px;
+    border-radius: 5px;
+    text-align: center;
+    color: #bbb;
+    position: relative;
+}

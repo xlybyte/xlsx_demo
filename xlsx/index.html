@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excel导入导出</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="./xlsx.full.min.js"></script>
+    <script src="./XlsxTool.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.13/vue.min.js"></script>
+    <!-- <script src="https://unpkg.com/vue/dist/vue.js"></script> -->
+    <!-- element-ui组件库 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css" />
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+  </head>
+  <body>
+    <p>人力资源OA系统里面有 导入导出Excel功能</p>
+    <div class="app-container">
+      <input type="file" accept=".xlsx, .xls" style="display: none" />
+      <div class="drop">
+        请将test.xlsx文件拖到此处
+        <button type="button" class="el-button el-button--primary el-button--mini" style="margin-left: 16px">
+          <span>选择文件</span>
+        </button>
+      </div>
+    </div>
+    <div id="app">
+      <!-- 导出按钮 -->
+      <el-button type="success" size="small" @click="exportExcelFn">导出excel</el-button>
+      <!-- 表格显示数据 -->
+      <el-table border :data="dataArr" style="width: 100%">
+        <el-table-column label="序号" type="index" ></el-table-column>
+        <el-table-column label="姓名" prop="username" ></el-table-column>
+        <el-table-column label="手机号" prop="mobile" width="120" ></el-table-column>
+        <el-table-column label="工号" prop="workNumber" ></el-table-column>
+        <el-table-column label="聘用形式" prop="formOfEmployment" ></el-table-column>
+        <el-table-column label="部门" prop="departmentName" ></el-table-column>
+        <el-table-column label="入职时间" prop="timeOfEntry" ></el-table-column>
+      </el-table>
+    </div>
+
+    <script>
+      // 监听拖放文件事件
+      const dropEl = document.querySelector(".drop")
+      function Dragover(e) {
+        e.stopPropagation()
+        e.preventDefault()
+      }
+      dropEl.addEventListener("dragover", Dragover)
+      dropEl.addEventListener("dragenter", Dragover)
+      dropEl.addEventListener("drop", function (e) {
+        e.stopPropagation()
+        e.preventDefault()
+        if (this.loading) return
+        const files = e.dataTransfer.files
+        if (files.length !== 1) {
+          console.log("文件错误0")
+          return
+        }
+        const rawFile = files[0] // 拿到第一个文件
+
+        if (!/\.(xlsx|xls|csv)$/.test(rawFile.name)) {
+          console.log("请导入excel文件")
+          return false
+        }
+        readerData(rawFile)
+        console.log("收到文件" + rawFile.name)
+        e.stopPropagation()
+        e.preventDefault()
+      })
+
+      // 读取文件内容---------------------------------------
+      function readerData(rawFile) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => {
+            const data = e.target.result
+            const workbook = XLSX.read(data, { type: "binary" }) // binary格式读取
+            const firstSheetName = workbook.SheetNames[0]
+            const worksheet = workbook.Sheets[firstSheetName]
+            const header = getHeaderRow(worksheet)
+            const results = XLSX.utils.sheet_to_json(worksheet)
+            console.log(header) // 读出的excel 表头，数组格式
+            console.log(results) // 读出的 excel 数据，数组格式
+            // 转换格式
+            app.dataArr = this.transExcel(results)
+            resolve()
+          }
+          // reader.readAsArrayBuffer(rawFile) // array数组方式
+          reader.readAsBinaryString(rawFile) // binary格式
+        })
+      }
+
+      // vue实例对象
+      const app = new Vue({
+        el: "#app",
+        data: function () {
+          return {
+            dataArr: []
+          }
+        },
+        created() {
+          console.dir(XLSX);
+        },
+        methods:{
+          // 导出excel被点击事件---------------------------------------
+          exportExcelFn(){
+            // 导出的列顺序和数组顺序一致，key为数据中的属性，name为导出后的列名
+            const xlsHeader = [
+              { key: 'id', name: '编号' },
+              { key: 'username', name: '姓名' },
+              { key: 'staffPhoto', name: '头像地址' },
+              { key: 'mobile', name: '手机号' },
+              { key: 'workNumber', name: '工号' },
+              { key: 'formOfEmployment', name: '聘用形式' },
+              { key: 'departmentName', name: '部门' },
+              { key: 'timeOfEntry', name: '入职日期' }
+            ]
+            // 导出
+            const list = this.dataArr // 要导出的数组对象
+            const tHeader = xlsHeader.map(obj => obj.name) // 遍历出表头
+            const data = list.map((obj, index) => {
+              // obj 为每一行数据对象
+              return xlsHeader.map(v => {
+                // 自定义对每一列数据进行处理
+                if (v.key === 'id') return index + 1
+                // if (v.key === 'formOfEmployment') return this.formatEmployeeFn(obj[v.key])
+                // if (v.key === 'timeOfEntry') return parseTime(obj[v.key], '{y}-{m}-{d}')
+                return obj[v.key]
+              })
+            })
+            // 开始导出
+            const dc = new XlsxTool()
+
+            console.log('导出tHeader',tHeader);
+            console.log('导出data',data);
+
+            dc.export_json_to_excel({
+            header: tHeader, // 导出的表头，['id', '姓名']
+            data, // 导出的数据，数组套数组格式。[['1', '张三'], ['2', '李四']]
+            filename: 'xlsxxlsx', // 文件名
+            autoWidth: true, // 是否自动列宽
+            bookType: 'xlsx' // 格式
+          })
+          }
+        }
+      })
+
+      // excel数据转提交格式
+      function transExcel(results) {
+        const userRelations = {
+          入职日期: "timeOfEntry",
+          手机号: "mobile",
+          姓名: "username",
+          转正日期: "correctionTime",
+          工号: "workNumber",
+          部门: "departmentName",
+          聘用形式: "formOfEmployment"
+        }
+        const arr = []
+        results.forEach(item => {
+          const obj = {}
+          const contentKeys = Object.keys(item)
+          contentKeys.forEach(k => {
+            const key = userRelations[k]
+            if (key) {
+              // 如果时间格式为数字，则需要调用函数转换
+              // if (key === 'timeOfEntry' || key === 'correctionTime') {
+              //   item[k] = formatExcelDate(item[k], '-')
+              // }
+              obj[key] = item[k]
+            }
+          })
+          arr.push(obj)
+        })
+        return arr
+      }
+
+      // 网络请求二进制方式读取文件----------------------------
+      var url = "/test.xlsx"
+      var http = new XMLHttpRequest()
+      http.open("GET", url, true)
+      http.responseType = "arraybuffer"
+      http.onload = readXLSX
+      http.send()
+
+      function readXLSX(e) {
+        var arraybuffer = http.response
+
+        /* 将数据转换为二进制字符串 */
+        var data = new Uint8Array(arraybuffer)
+        var arr = new Array()
+        for (var i = 0; i != data.length; ++i) arr[i] = String.fromCharCode(data[i])
+        var bstr = arr.join("")
+
+        /* 调用 XLSX */
+        var workbook = XLSX.read(bstr, { type: "binary" })
+
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+        const header = getHeaderRow(worksheet)
+        const results = XLSX.utils.sheet_to_json(worksheet)
+
+        console.log(header) // 读出的excel 表头，数组格式
+        console.log(results) // 读出的 excel 数据，数组格式
+
+        /* 在这里用工作簿做些什么 */
+      }
+
+      function getHeaderRow(sheet) {
+        const headers = []
+        const range = XLSX.utils.decode_range(sheet["!ref"])
+        let C
+        const R = range.s.r
+        /* 从第一行开始 */
+        for (C = range.s.c; C <= range.e.c; ++C) {
+          /* 遍历范围内的每一列 */
+          const cell = sheet[XLSX.utils.encode_cell({ c: C, r: R })]
+          /* 找到第一行中的单元格 */
+          let hdr = "UNKNOWN " + C // <-- 用所需的默认值替换
+          if (cell && cell.t) hdr = XLSX.utils.format_cell(cell)
+          headers.push(hdr)
+        }
+        return headers
+      }
+
+      
+    </script>
+  </body>
+</html>
